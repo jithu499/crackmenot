@@ -1,0 +1,45 @@
+# CrackMeNot 🔐
+
+CrackMeNot is a sleek, hacker-themed password strength checker built with HTML, Tailwind CSS, and JavaScript. It analyzes password strength in real-time, provides suggestions, and even estimates crack time using entropy-based calculations.
+
+## 🚀 Features
+
+- Real-time password strength analysis
+- Strength visualization with animated pie chart
+- Entropy-based crack time estimation
+- Wordlist comparison using `rockyou.txt`
+- Suggestions for stronger passwords
+- Toggle password visibility
+- Clean and neon-glow hacker UI
+
+## 🧠 How It Works
+
+The strength score is calculated based on:
+- Length of the password
+- Use of uppercase, lowercase, numbers, and symbols
+- Common password avoidance (using a wordlist)
+- Detection of patterns like repeated characters or keyboard sequences
+
+## 🛠️ How to Use
+
+1. Clone the repo or download the HTML file.
+2. Make sure `rockyou.txt` is available in the same directory (optional but improves accuracy).
+3. Open `index.html` (or rename the provided file) in your browser.
+4. Type a password and get real-time feedback!
+
+## 📁 Files
+
+- `index.html`: Main application
+- `rockyou.txt`: (optional) Common password wordlist
+
+## 👨‍💻 Developer
+
+Made with ☕ and 💻 by **HexViper**
+
+## 📄 License
+
+MIT License – feel free to use, modify, and share.
+
+---
+
+> 💡 *Stronger passwords = safer data. CrackMeNot helps you build better digital defenses.*
