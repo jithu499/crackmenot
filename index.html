@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CrackMeNot - Password Strength Checker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Roboto Mono', monospace;
+      background-color: #0f111a;
+      color: #00ff99;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+      user-select: none;
+    }
+    .page {
+      width: 100%;
+      max-width: 420px;
+      background: #121622;
+      border-radius: 1rem;
+      box-shadow: 0 0 15px #00ff99, 0 0 30px #00ff99 inset;
+      padding: 2rem;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      border: 1px solid #00ff99;
+    }
+    h1 {
+      text-shadow: 0 0 8px #00ff99, 0 0 20px #00ff99;
+    }
+    label {
+      color: #00ff99;
+      font-weight: 700;
+      text-shadow: 0 0 5px #00ff99;
+    }
+    input {
+      background-color: #1a1f2a;
+      color: #00ff99;
+      border: 1px solid #00ff99;
+      box-shadow: 0 0 5px #00ff99 inset;
+    }
+    input::placeholder {
+      color: #00ff99aa;
+    }
+    input:focus {
+      outline: none;
+      box-shadow: 0 0 10px #00ff99;
+      border-color: #00ff99;
+    }
+    button#togglePassword {
+      color: #00ff99;
+      transition: color 0.3s ease;
+    }
+    button#togglePassword:hover {
+      color: #00ffaa;
+    }
+    #strengthText {
+      font-weight: 700;
+      font-size: 1.25rem;
+      text-shadow: 0 0 8px #00ff99;
+    }
+    #crackTime {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #00cc66;
+      text-shadow: 0 0 6px #00cc66;
+      min-height: 1.5rem;
+    }
+    #suggestions {
+      margin-top: 1rem;
+      color: #00ff99cc;
+      list-style-type: disc;
+      list-style-position: inside;
+      max-width: 100%;
+      font-size: 0.9rem;
+      text-shadow: 0 0 4px #00ff99aa;
+    }
+    canvas#strengthChart {
+      filter: drop-shadow(0 0 5px #00ff99);
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- Single Page: Password Input and Strength -->
+  <section id="mainPage" class="page">
+    <h1 class="text-5xl font-extrabold text-center mb-6 select-text">CrackMeNot</h1>
+    <p class="text-center text-green-400 mb-8 select-text">Password Strength Checker</p>
+    <label for="passwordInput" class="block mb-2 select-text">Enter Password</label>
+    <div class="relative w-full mb-6">
+      <input
+        type="password"
+        id="passwordInput"
+        class="w-full p-3 rounded pr-12"
+        placeholder="Type your password here"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button
+        type="button"
+        id="togglePassword"
+        class="absolute inset-y-0 right-0 pr-3 flex items-center focus:outline-none"
+        aria-label="Toggle password visibility"
+      >
+        <i class="fas fa-eye" id="eyeIcon"></i>
+      </button>
+    </div>
+    <div class="flex flex-col items-center">
+      <canvas id="strengthChart" width="200" height="200" aria-label="Password strength chart" role="img"></canvas>
+      <p id="strengthText" class="mt-6 text-center"></p>
+      <p id="crackTime" class="text-center"></p>
+      <ul id="suggestions" class="max-w-md"></ul>
+    </div>
+  </section>
+  <footer style="width: 100%; max-width: 420px; text-align: center; padding: 0.5rem 0; color: #00ff99aa; font-size: 0.85rem; user-select: none; text-shadow: 0 0 3px #00ff99aa;">
+    &copy; Developed by HexViper
+  </footer>
+
+  <script>
+    const passwordInput = document.getElementById('passwordInput');
+    const strengthText = document.getElementById('strengthText');
+    const crackTime = document.getElementById('crackTime');
+    const suggestionsList = document.getElementById('suggestions');
+    const canvas = document.getElementById('strengthChart');
+    const ctx = canvas.getContext('2d');
+    const togglePassword = document.getElementById('togglePassword');
+    const eyeIcon = document.getElementById('eyeIcon');
+
+    let wordlist = new Set();
+
+    // Load the rockyou.txt wordlist
+    async function loadWordlist() {
+      try {
+        const response = await fetch('rockyou.txt');
+        const text = await response.text();
+        const lines = text.split('\\n');
+        lines.forEach(line => {
+          wordlist.add(line.trim());
+        });
+      } catch (error) {
+        console.error('Error loading wordlist:', error);
+      }
+    }
+
+    // Calculate password strength score (0 to 100)
+    function calculateStrength(password) {
+      if (!password) return 0;
+
+      let score = 0;
+
+      // Check if password is in wordlist (very weak)
+      if (wordlist.has(password)) {
+        return 10;
+      }
+
+      // Length score
+      if (password.length >= 12) score += 40;
+      else if (password.length >= 8) score += 30;
+      else score += password.length * 3;
+
+      // Character variety
+      const hasLower = /[a-z]/.test(password);
+      const hasUpper = /[A-Z]/.test(password);
+      const hasNumber = /[0-9]/.test(password);
+      const hasSymbol = /[^A-Za-z0-9]/.test(password);
+
+      let varietyCount = [hasLower, hasUpper, hasNumber, hasSymbol].filter(Boolean).length;
+      score += varietyCount * 15;
+
+      // Cap score at 100
+      if (score > 100) score = 100;
+
+      return score;
+    }
+
+    // Generate password improvement suggestions
+    function generateSuggestions(password) {
+      const suggestions = [];
+      if (!password) return suggestions;
+
+      if (wordlist.has(password)) {
+        suggestions.push('Avoid common passwords');
+      }
+      if (password.length < 8) {
+        suggestions.push('Increase password length to at least 8 characters');
+      }
+      if (!/[a-z]/.test(password)) {
+        suggestions.push('Add lowercase letters');
+      }
+      if (!/[A-Z]/.test(password)) {
+        suggestions.push('Add uppercase letters');
+      }
+      if (!/[0-9]/.test(password)) {
+        suggestions.push('Add numbers');
+      }
+      if (!/[^A-Za-z0-9]/.test(password)) {
+        suggestions.push('Add symbols (e.g., !@#$%)');
+      }
+
+      // Check for repeated characters or sequences
+      if (/(.)\1{2,}/.test(password)) {
+        suggestions.push('Avoid repeated characters or sequences');
+      }
+
+      // Check for keyboard patterns (simple heuristic)
+      const keyboardPatterns = ['qwerty', 'asdf', 'zxcv', '1234', 'password', 'admin'];
+      const lowerPass = password.toLowerCase();
+      for (const pattern of keyboardPatterns) {
+        if (lowerPass.includes(pattern)) {
+          suggestions.push('Avoid common keyboard patterns or words');
+          break;
+        }
+      }
+
+      if (password.length >= 12) {
+        suggestions.push('Great! Consider using a passphrase for even stronger security.');
+      } else if (password.length >= 8) {
+        suggestions.push('Consider using a longer passphrase for better security.');
+      }
+
+      return suggestions;
+    }
+
+    // Estimate time to crack password in seconds (very rough estimate)
+    function estimateCrackTime(password) {
+      if (!password) return '';
+
+      // Estimate entropy bits
+      let poolSize = 0;
+      if (/[a-z]/.test(password)) poolSize += 26;
+      if (/[A-Z]/.test(password)) poolSize += 26;
+      if (/[0-9]/.test(password)) poolSize += 10;
+      if (/[^A-Za-z0-9]/.test(password)) poolSize += 32; // symbols approx
+
+      const entropy = password.length * Math.log2(poolSize || 1);
+
+      // Assume 1 billion guesses per second attacker
+      const guessesPerSecond = 1e9;
+
+      // Calculate seconds to crack
+      const seconds = Math.pow(2, entropy) / guessesPerSecond;
+
+      if (seconds < 1) return 'Instantly cracked';
+      if (seconds < 60) return `${Math.floor(seconds)} seconds to crack`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes to crack`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours to crack`;
+      if (seconds < 31536000) return `${Math.floor(seconds / 86400)} days to crack`;
+      if (seconds < 3153600000) return `${Math.floor(seconds / 31536000)} years to crack`;
+      return 'Centuries to crack';
+    }
+
+    // Draw pie chart animation for strength
+    function drawPieChart(strength) {
+      const radius = 90;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Background circle (dark)
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = '#0f111a';
+      ctx.fill();
+
+      // Colored arc for strength
+      let endAngle = (strength / 100) * 2 * Math.PI;
+      if (strength === 100) {
+        endAngle = 2 * Math.PI + 0.01; // Slightly more than full circle to ensure full arc
+      }
+
+      // Color based on strength
+      let color = '#ef4444'; // red for weak
+      if (strength > 70) color = '#22c55e'; // green for strong
+      else if (strength > 40) color = '#facc15'; // yellow for medium
+
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, -Math.PI / 2, endAngle - Math.PI / 2, false);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      // Inner circle
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius - 25, 0, 2 * Math.PI);
+      ctx.fillStyle = '#121622';
+      ctx.fill();
+
+      // Text in center
+      ctx.fillStyle = '#00ff99';
+      ctx.font = 'bold 24px Roboto Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(strength + '%', centerX, centerY);
+    }
+
+    // Update strength display, suggestions, and crack time
+    function updateStrength() {
+      const password = passwordInput.value;
+      const strength = calculateStrength(password);
+      drawPieChart(strength);
+
+      let text = '';
+      if (strength === 0) text = '';
+      else if (strength <= 30) text = 'Very Weak';
+      else if (strength <= 60) text = 'Weak';
+      else if (strength <= 80) text = 'Medium';
+      else if (strength < 100) text = 'Strong';
+      else text = 'Very Strong';
+
+      strengthText.textContent = text;
+
+      crackTime.textContent = estimateCrackTime(password);
+
+      // Update suggestions
+      const suggestions = generateSuggestions(password);
+      suggestionsList.innerHTML = '';
+      if (suggestions.length > 0) {
+        suggestions.forEach(suggestion => {
+          const li = document.createElement('li');
+          li.textContent = suggestion;
+          suggestionsList.appendChild(li);
+        });
+      }
+    }
+
+    passwordInput.addEventListener('input', updateStrength);
+
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passwordInput.setAttribute('type', type);
+      eyeIcon.classList.toggle('fa-eye');
+      eyeIcon.classList.toggle('fa-eye-slash');
+    });
+
+    loadWordlist();
+  </script>
+</body>
+</html>
